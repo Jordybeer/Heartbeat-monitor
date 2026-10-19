@@ -13,6 +13,7 @@ final class HeartbeatUITests: XCTestCase {
             begin.tap()
         }
         XCTAssertTrue(app.staticTexts["Tijdlijn"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["monitor.toggle"].isHittable, "Start/Stop must be reachable without scrolling")
         screenshot("Monitor")
         app.tabBars.buttons["Geschiedenis"].tap()
         XCTAssertTrue(app.staticTexts["Nog geen meetlog"].waitForExistence(timeout: 5))

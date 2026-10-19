@@ -86,12 +86,6 @@ struct MonitorView: View {
                             }
                         }
                     }
-                    Button {
-                        Task { if model.isRequested { await model.stop() } else { await model.start() } }
-                    } label: {
-                        Label(model.isStopping ? "Afronden…" : model.isRequested ? "Meting stoppen" : "Meting starten", systemImage: model.isRequested ? "stop.fill" : "play.fill")
-                            .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 12)
-                    }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!model.ready || model.isStopping)
                     if model.settings.threshold.enabled {
                         Label("Grens \(Int(model.settings.threshold.bpm)) BPM · \(Int(model.settings.threshold.duration)) seconden", systemImage: "bell").font(.caption).foregroundStyle(.secondary)
                     }
@@ -99,6 +93,15 @@ struct MonitorView: View {
             }.background(Palette.background)
         }
         .navigationTitle("Heartbeat").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { Task { if model.isRequested { await model.stop() } else { await model.start() } } } label: {
+                    Label(model.isStopping ? "Afronden…" : model.isRequested ? "Stop" : "Start", systemImage: model.isRequested ? "stop.fill" : "play.fill")
+                }.buttonStyle(.borderedProminent).disabled(!model.ready || model.isStopping)
+                    .accessibilityLabel(model.isRequested ? "Meting stoppen" : "Meting starten")
+                    .accessibilityIdentifier("monitor.toggle")
+            }
+        }
         .sheet(isPresented: $showSensors) { SensorPickerView().environmentObject(model) }
     }
     private func visibleSamples(at now: Date) -> [HeartbeatCore.HeartRateSample] {

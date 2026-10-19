@@ -32,7 +32,7 @@ struct HeartbeatApp: App {
         WindowGroup {
             RootView().environmentObject(model).tint(Palette.accent)
                 .sheet(isPresented: Binding(get: { !model.hasOnboarded }, set: { _ in })) {
-                    OnboardingView().environmentObject(model).interactiveDismissDisabled()
+                    OnboardingView().environmentObject(model).tint(Palette.accent).interactiveDismissDisabled()
                 }
                 .onChange(of: scenePhase) { _, value in if value == .active { model.createLiveActivity() } }
         }

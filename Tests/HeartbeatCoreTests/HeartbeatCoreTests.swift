@@ -62,4 +62,13 @@ final class HeartbeatCoreTests: XCTestCase {
         XCTAssertTrue(text.contains("1970-01-01T00:00:00.000Z"))
         XCTAssertTrue(text.contains("\"AirPods, \"\"left\"\"\""))
     }
+    func testChartSeparatesSensorChangesWithoutAGap() {
+        let a = HeartRateSample(bpm: 80, timestamp: base, source: "AirPods")
+        let b = HeartRateSample(bpm: 90, timestamp: base.addingTimeInterval(1), source: "Other sensor")
+        XCTAssertEqual(ChartSegments.split([a,b]).map(\.count), [1,1])
+    }
+    func testSensorNamesCannotBecomeSpreadsheetFormulas() {
+        let item = HeartRateSample(bpm: 80, timestamp: base, source: "=1+1")
+        XCTAssertTrue(CSVExport.render([item]).contains("\"'=1+1\""))
+    }
 }

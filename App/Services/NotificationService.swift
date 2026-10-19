@@ -1,4 +1,5 @@
 import UserNotifications
+import Foundation
 import HeartbeatCore
 
 enum NotificationService {

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
@@ -28,6 +28,12 @@ jobs:
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
+          python3 - <<'PY'
+          import subprocess,re
+          version=subprocess.check_output(['xcodebuild','-version'],text=True).splitlines()[0]
+          numbers=tuple(map(int,re.search(r'Xcode (\d+)\.(\d+)',version).groups()))
+          assert numbers >= (26,4), 'Xcode 26.4+ required for simulator hang fix 172343027'
+          PY
       - name: Test measurement domain
         run: swift test
       - name: Generate Xcode project
@@ -60,14 +66,22 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Choose iPhone simulator
+        timeout-minutes: 3
         run: |
           xcrun simctl list devices available -j > build/simulators.json
           python3 - <<'PY' >> "$GITHUB_ENV"
-          import json
-          devices=[d for group in json.load(open('build/simulators.json'))['devices'].values() for d in group if 'iPhone' in d['name']]
-          devices.sort(key=lambda d: ('iPhone 17' not in d['name'], d['name']))
+          import json,re,sys
+          devices=[]
+          for runtime,group in json.load(open('build/simulators.json'))['devices'].items():
+              match=re.search(r'\.iOS-(\d+)-(\d+)',runtime)
+              if not match or int(match[1]) < 26: continue
+              for device in group:
+                  if 'iPhone' in device['name']: devices.append((tuple(map(int,match.groups())),runtime,device))
+          devices.sort(key=lambda item: ('iPhone 17' not in item[2]['name'], -item[0][0], -item[0][1], item[2]['name']))
           if not devices: raise SystemExit('No iPhone simulator available')
-          print('SIMULATOR_ID='+devices[0]['udid'])
+          _,runtime,device=devices[0]
+          print(device['name']+' / '+runtime,file=sys.stderr)
+          print('SIMULATOR_ID='+device['udid'])
           PY
       - name: Boot selected iPhone simulator
         timeout-minutes: 5
@@ -94,5 +108,6 @@ jobs:
           path: |
             build/screenshots/
             build/ui-tests.log
+            build/simulators.json
           if-no-files-found: ignore
           retention-days: 7

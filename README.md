@@ -45,7 +45,7 @@ Bij een gratis account moet de ondertekening tijdig worden vernieuwd, doorgaans 
 
 ## Build en controle
 
-De workflow gebruikt een GitHub-hosted macOS-runner, selecteert een beschikbare stabiele Xcode 26-toolchain en noteert de exacte versie. Daarna:
+De workflow gebruikt een GitHub-hosted macOS 26-runner, selecteert een beschikbare stabiele Xcode 26.4+-toolchain en noteert de exacte versie. De nieuwere versie bevat Apples oplossing voor vastlopende simulatorprocessen. Daarna:
 
 1. `swift test` test BLE-pakketdecodering, alarmduur/herstel, veroudering, dubbelen, tijdsvolgorde, grafiekgaten en CSV.
 2. XcodeGen maakt het Xcode-project uit `project.yml`.

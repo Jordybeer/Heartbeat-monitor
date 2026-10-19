@@ -118,14 +118,19 @@ final class HeartbeatUITests: XCTestCase {
         let expected = enabled ? "1" : "0"
         if element.value as? String != expected {
             XCTAssertTrue(element.isHittable)
-            // iOS exposes both the SwiftUI row and a separate native UISwitch.
+            // Form exposes both the SwiftUI row and a separate native UISwitch.
             // Resolve the control inside this row rather than guessing a row offset.
             let rowFrame = element.frame
             let native = app.switches.matching(NSPredicate(format: "label == ''"))
                 .allElementsBoundByIndex.first { rowFrame.contains($0.frame) && $0.isHittable }
-            XCTAssertNotNil(native, "Expected a native switch inside \(element.label)")
-            guard let native else { return }
-            native.press(forDuration: 0.2)
+            if let native {
+                native.press(forDuration: 0.2)
+            } else {
+                // The onboarding ScrollView exposes one combined SwiftUI switch,
+                // unlike Form rows. Its trailing control is part of that element.
+                element.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+                    .press(forDuration: 0.2)
+            }
         }
         let changed = NSPredicate(format: "value == %@", expected)
         let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: changed, object: element)], timeout: 10)

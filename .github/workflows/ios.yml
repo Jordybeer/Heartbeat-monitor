@@ -39,12 +39,12 @@ jobs:
           set -o pipefail
           xcodebuild -project Heartbeat.xcodeproj -scheme Heartbeat -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build > build/device-build.log 2>&1 || { tail -150 build/device-build.log; exit 1; }
           tail -12 build/device-build.log
-      - name: Package unsigned IPA
+      - name: Package SideStore IPA
         run: |
           bash scripts/package_ipa.sh build/DerivedData/Build/Products/Release-iphoneos/Heartbeat.app
           bash scripts/build_metadata.sh
           cp App/Heartbeat.entitlements build/artifacts/Expected-HealthKit.entitlements
-          shasum -a 256 build/artifacts/Heartbeat-unsigned.ipa > build/artifacts/SHA256.txt
+          shasum -a 256 build/artifacts/Heartbeat-sideload.ipa > build/artifacts/SHA256.txt
       - name: Upload IPA and build metadata
         uses: actions/upload-artifact@v4
         with:

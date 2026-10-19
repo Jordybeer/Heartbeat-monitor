@@ -25,12 +25,12 @@ De dagelijkse route wordt niet ongemerkt vervangen door een fictieve work-out. D
 
 1. Open [GitHub Actions](https://github.com/Jordybeer/Heartbeat-monitor/actions/workflows/ios.yml) en kies een **geslaagde** run van de gewenste commit.
 2. Download het artifact `Heartbeat-IPA-<runnummer>` en pak de ZIP uit.
-3. Open `Heartbeat-unsigned.ipa` in SideStore. De IPA is **niet ondertekend**; SideStore moet deze eerst met je eigen Apple-account ondertekenen.
+3. Open `Heartbeat-sideload.ipa` in SideStore. SideStore moet deze met je eigen Apple-account voor je toestel ondertekenen. De build bevat alleen een ad-hoc-metadatahandtekening om de HealthKit-rechten mee te geven; er is geen ontwikkelaarscertificaat of installatieprofiel ingebouwd.
 4. **Behoud de app-extensie** (`HeartbeatWidget.appex`). Verwijderen daarvan verwijdert de Live Activity/Dynamic Island-ondersteuning.
 5. Sta de gevraagde Bluetooth- of HealthKit-toegang toe wanneer je de betreffende functie gebruikt. Notificaties vraag je pas aan wanneer je de meldingsschakelaar inschakelt.
 6. Controleer na installatie én na vernieuwen dat HealthKit en de widget nog werken. SideStore/provisioning kan rechten veranderen; HealthKit verwijderen uit de signing is geen oplossing voor een werkende HealthKit-app.
 
-Bij een gratis account moet de ondertekening tijdig worden vernieuwd, doorgaans binnen zeven dagen. SideStore gebruikt zelf een van de drie beschikbare appslots. `BUILD.txt`, de verwachte HealthKit-entitlement en `SHA256.txt` reizen mee met het artifact. Deel geen Apple-wachtwoord, pairingbestand of certificaat in deze publieke repository.
+Bij een gratis account moet de ondertekening tijdig worden vernieuwd, doorgaans binnen zeven dagen. SideStore gebruikt zelf een van de drie beschikbare appslots. `BUILD.txt`, de verwachte én uit de IPA-handtekening gelezen HealthKit-entitlements en `SHA256.txt` reizen mee met het artifact. Deel geen Apple-wachtwoord, pairingbestand of certificaat in deze publieke repository.
 
 ## Gebruiksdetails
 
@@ -50,7 +50,7 @@ De workflow gebruikt een GitHub-hosted macOS-runner, selecteert een beschikbare 
 1. `swift test` test BLE-pakketdecodering, alarmduur/herstel, veroudering, dubbelen, tijdsvolgorde, grafiekgaten en CSV.
 2. XcodeGen maakt het Xcode-project uit `project.yml`.
 3. `xcodebuild` compileert de app en de Live Activity-extensie voor echte iPhones zonder ondertekening.
-4. De verpakkingsstap controleert dat beide executables in de IPA zitten.
+4. De verpakkingsstap geeft HealthKit-rechten mee aan de re-signer en controleert de handtekening en beide executables in de IPA.
 5. Een simulator-UI-test loopt onboarding, monitor, geschiedenis en instellingen door en bewaart echte schermopnamen.
 
 Zelf bouwen op een geschikte Mac:

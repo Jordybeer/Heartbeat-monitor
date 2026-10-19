@@ -2,7 +2,7 @@
 set -euo pipefail
 mkdir -p build/artifacts
 {
-  echo "Heartbeat unsigned device build"
+  echo "Heartbeat sideload build (ad hoc metadata signature; device signing still required)"
   echo "Commit: ${GITHUB_SHA:-local}"
   echo "Run: ${GITHUB_RUN_ID:-local}"
   echo "Built: $(date -u +%FT%TZ)"

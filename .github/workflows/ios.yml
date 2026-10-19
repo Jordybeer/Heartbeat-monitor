@@ -2,7 +2,7 @@ name: iOS IPA
 
 on:
   push:
-    branches: [main, codex/oneshot]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -18,7 +18,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Select iOS 26 toolchain
         shell: bash
         run: |
@@ -30,3 +30,63 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
       - name: Test measurement domain
         run: swift test
+      - name: Generate Xcode project
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate
+      - name: Build iPhone app and Live Activity
+        run: |
+          set -o pipefail
+          xcodebuild -project Heartbeat.xcodeproj -scheme Heartbeat -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build > build/device-build.log 2>&1 || { tail -150 build/device-build.log; exit 1; }
+          tail -12 build/device-build.log
+      - name: Package unsigned IPA
+        run: |
+          bash scripts/package_ipa.sh build/DerivedData/Build/Products/Release-iphoneos/Heartbeat.app
+          bash scripts/build_metadata.sh
+          cp App/Heartbeat.entitlements build/artifacts/Expected-HealthKit.entitlements
+          shasum -a 256 build/artifacts/Heartbeat-unsigned.ipa > build/artifacts/SHA256.txt
+      - name: Upload IPA and build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heartbeat-IPA-${{ github.run_number }}
+          path: build/artifacts/
+          retention-days: 14
+      - name: Upload compilation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heartbeat-build-log-${{ github.run_number }}
+          path: build/device-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Choose iPhone simulator
+        run: |
+          xcrun simctl list devices available -j > build/simulators.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          devices=[d for group in json.load(open('build/simulators.json'))['devices'].values() for d in group if 'iPhone' in d['name']]
+          devices.sort(key=lambda d: ('iPhone 17' not in d['name'], d['name']))
+          if not devices: raise SystemExit('No iPhone simulator available')
+          print('SIMULATOR_ID='+devices[0]['udid'])
+          PY
+      - name: Verify native screens
+        run: |
+          set -o pipefail
+          xcodebuild test -project Heartbeat.xcodeproj -scheme Heartbeat -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator -resultBundlePath build/UITests.xcresult CODE_SIGNING_ALLOWED=NO > build/ui-tests.log 2>&1 || { tail -100 build/ui-tests.log; exit 1; }
+          tail -15 build/ui-tests.log
+      - name: Export native screen captures
+        if: always()
+        run: |
+          if [ -d build/UITests.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/UITests.xcresult --output-path build/screenshots
+          fi
+      - name: Upload UI verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heartbeat-UI-${{ github.run_number }}
+          path: |
+            build/screenshots/
+            build/ui-tests.log
+          if-no-files-found: ignore
+          retention-days: 7

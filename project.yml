@@ -1,0 +1,88 @@
+name: Heartbeat
+options:
+  bundleIdPrefix: beer.jordy
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  HeartbeatCore:
+    path: .
+targets:
+  Heartbeat:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    dependencies:
+      - package: HeartbeatCore
+      - target: HeartbeatWidget
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: beer.jordy.heartbeat
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: HEARTBEAT_APP
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: build/Heartbeat-Info.plist
+      properties:
+        CFBundleDisplayName: Heartbeat
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSBluetoothAlwaysUsageDescription: Heartbeat ontvangt je hartslag van een verbonden Bluetooth-hartslagsensor.
+        NSHealthShareUsageDescription: Bekijk hartslaggegevens uit Apple Gezondheid en volg je hartslag tijdens een door jou gestarte work-out.
+        NSHealthUpdateUsageDescription: Bewaar alleen de work-outs die je zelf in Heartbeat start.
+        UIBackgroundModes: [bluetooth-central]
+        NSSupportsLiveActivities: true
+    entitlements:
+      path: App/Heartbeat.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+  HeartbeatWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widget
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: beer.jordy.heartbeat.live
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    info:
+      path: build/HeartbeatWidget-Info.plist
+      properties:
+        CFBundleDisplayName: Heartbeat Live
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  HeartbeatUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: Heartbeat
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: beer.jordy.heartbeat.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Heartbeat
+schemes:
+  Heartbeat:
+    build:
+      targets:
+        Heartbeat: all
+        HeartbeatWidget: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+    test:
+      config: Debug
+      targets:
+        - HeartbeatUITests

@@ -47,7 +47,8 @@ final class HeartbeatCoreTests: XCTestCase {
         XCTAssertEqual(HeartRatePacket.decode(Data([0x01, 0x2C, 0x01]))?.bpm, 300)
     }
     func testBluetoothRejectsTruncationZeroAndLostContact() {
-        for bytes: [UInt8] in [[], [1], [1, 44], [0, 0], [0x04, 72], [0x08, 72], [0x10, 72, 1]] {
+        let invalid: [[UInt8]] = [[], [1], [1, 44], [0, 0], [0x04, 72], [0x08, 72], [0x10, 72, 1]]
+        for bytes in invalid {
             XCTAssertNil(HeartRatePacket.decode(Data(bytes)), "Invalid packet: \(bytes)")
         }
         XCTAssertEqual(HeartRatePacket.decode(Data([0x06, 72]))?.bpm, 72)

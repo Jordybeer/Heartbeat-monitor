@@ -13,7 +13,7 @@ final class HeartbeatUITests: XCTestCase {
             screenshot("Onboarding")
             for _ in 0..<5 where !begin.isHittable { app.swipeUp() }
             let automatic = app.switches["Automatisch starten bij AirPods-gebruik"]
-            setSwitch(automatic, enabled: false)
+            setSwitch(automatic, enabled: false, in: app)
             begin.tap()
         }
         XCTAssertTrue(app.staticTexts["Tijdlijn"].waitForExistence(timeout: 10))
@@ -36,8 +36,8 @@ final class HeartbeatUITests: XCTestCase {
         app.tabBars.buttons["Instellingen"].tap()
         let automatic = app.switches["Automatisch starten"]
         XCTAssertTrue(automatic.waitForExistence(timeout: 10))
-        setSwitch(automatic, enabled: false)
-        setSwitch(automatic, enabled: true)
+        setSwitch(automatic, enabled: false, in: app)
+        setSwitch(automatic, enabled: true, in: app)
         app.tabBars.buttons["Nu"].tap()
 
         let toggle = app.buttons["monitor.toggle"]
@@ -88,7 +88,7 @@ final class HeartbeatUITests: XCTestCase {
         let previous = privacy.value as? String
         XCTAssertTrue(previous == "0" || previous == "1")
         let expected = previous == "1" ? "0" : "1"
-        setSwitch(privacy, enabled: expected == "1")
+        setSwitch(privacy, enabled: expected == "1", in: app)
 
         app.terminate()
         app.launch()
@@ -113,13 +113,19 @@ final class HeartbeatUITests: XCTestCase {
         XCTAssertEqual(result, .completed, "Expected enabled session control: \(label); got \(element.label)")
     }
 
-    private func setSwitch(_ element: XCUIElement, enabled: Bool) {
+    private func setSwitch(_ element: XCUIElement, enabled: Bool, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
         let expected = enabled ? "1" : "0"
         if element.value as? String != expected {
             XCTAssertTrue(element.isHittable)
-            // SwiftUI exposes the whole labeled row as a switch. Hit the trailing control.
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            // iOS exposes both the SwiftUI row and a separate native UISwitch.
+            // Resolve the control inside this row rather than guessing a row offset.
+            let rowFrame = element.frame
+            let native = app.switches.matching(NSPredicate(format: "label == ''"))
+                .allElementsBoundByIndex.first { rowFrame.contains($0.frame) && $0.isHittable }
+            XCTAssertNotNil(native, "Expected a native switch inside \(element.label)")
+            guard let native else { return }
+            native.press(forDuration: 0.2)
         }
         let changed = NSPredicate(format: "value == %@", expected)
         let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: changed, object: element)], timeout: 10)

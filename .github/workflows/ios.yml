@@ -92,7 +92,7 @@ jobs:
         timeout-minutes: 12
         run: |
           set -o pipefail
-          xcodebuild test -project Heartbeat.xcodeproj -scheme Heartbeat -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -destination-timeout 120 -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 180 -derivedDataPath build/Simulator -resultBundlePath build/UITests.xcresult CODE_SIGNING_ALLOWED=NO > build/ui-tests.log 2>&1 || { tail -100 build/ui-tests.log; exit 1; }
+          xcodebuild test -project Heartbeat.xcodeproj -scheme Heartbeat -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -destination-timeout 120 -parallel-testing-enabled NO -test-iterations 3 -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 180 -derivedDataPath build/Simulator -resultBundlePath build/UITests.xcresult CODE_SIGNING_ALLOWED=NO > build/ui-tests.log 2>&1 || { tail -100 build/ui-tests.log; exit 1; }
           tail -15 build/ui-tests.log
       - name: Export native screen captures
         if: always()

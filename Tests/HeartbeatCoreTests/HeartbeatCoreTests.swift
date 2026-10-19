@@ -71,4 +71,25 @@ final class HeartbeatCoreTests: XCTestCase {
         let item = HeartRateSample(bpm: 80, timestamp: base, source: "=1+1")
         XCTAssertTrue(CSVExport.render([item]).contains("\"'=1+1\""))
     }
+
+    func testFreshnessBoundariesAndInvalidBPM() {
+        let item = sample(80, 0)
+        XCTAssertTrue(item.isFresh(at: base.addingTimeInterval(-2)))
+        XCTAssertFalse(item.isFresh(at: base.addingTimeInterval(-2.001)))
+        XCTAssertTrue(item.isFresh(at: base.addingTimeInterval(15)))
+        XCTAssertFalse(item.isFresh(at: base.addingTimeInterval(15.001)))
+        for bpm in [0.0, -1, .nan, .infinity, -.infinity] {
+            XCTAssertFalse(sample(bpm, 0).isFresh(at: base))
+        }
+    }
+
+    func testReturningToThresholdResetsPendingDuration() {
+        var engine = ThresholdEngine(rule: .init(enabled: true, bpm: 120, duration: 30))
+        for (time, bpm) in [(0.0, 130.0), (10, 130), (20, 120), (30, 130), (40, 130), (50, 130)] {
+            XCTAssertNil(engine.consume(sample(bpm, time), now: base.addingTimeInterval(time)))
+        }
+        let trigger = engine.consume(sample(130, 60), now: base.addingTimeInterval(60))
+        XCTAssertEqual(trigger?.beganAt, base.addingTimeInterval(30))
+        XCTAssertEqual(trigger?.triggeredAt, base.addingTimeInterval(60))
+    }
 }

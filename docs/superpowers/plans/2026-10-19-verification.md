@@ -39,3 +39,7 @@
 - [ ] Open a reviewable test-only PR; report the exact CI result and remaining hardware checks.
 
 These tests cover existing behavior. A failing assertion will be investigated before any production fix; passing tests alone do not establish a RED-to-GREEN bug fix.
+
+## CI finding
+
+Both the unchanged main re-run and the test-only run timed out during the simulator's initial data migration, before launching Heartbeat. The previous successful run used the same Xcode 26.6 / iOS 26.5 image and completed its cold boot in about three minutes. Increase only the boot-step budget from five to ten minutes; retain the overall thirty-minute job bound and all test assertions. A successful boot and executed UI tests are required before calling verification complete.

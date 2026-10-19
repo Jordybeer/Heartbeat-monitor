@@ -12,6 +12,7 @@ final class HealthMonitor: NSObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuil
     private var generation = UUID()
     private var stopContinuation: CheckedContinuation<Date, Error>?
     private var stopToken: UUID?
+    private var stopping: Task<Void, Error>?
     private let heartRate = HKQuantityType.quantityType(forIdentifier: .heartRate)!
     var needsRecovery: Bool { UserDefaults.standard.bool(forKey: "workoutWasActive") }
 
@@ -48,6 +49,13 @@ final class HealthMonitor: NSObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuil
         onStatus?("Work-out actief. Wachten op hartslag…")
     }
     func stop() async throws {
+        if let stopping { try await stopping.value; return }
+        let task = Task { try await finishSession() }
+        stopping = task
+        defer { stopping = nil }
+        try await task.value
+    }
+    private func finishSession() async throws {
         generation = UUID()
         guard let session, let builder else { UserDefaults.standard.set(false, forKey: "workoutWasActive"); return }
         defer {

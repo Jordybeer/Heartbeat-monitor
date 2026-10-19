@@ -6,6 +6,8 @@ final class HeartbeatUITests: XCTestCase {
         app.launch()
         let begin = app.buttons["Beginnen"]
         if begin.waitForExistence(timeout: 10) {
+            screenshot("Onboarding")
+            for _ in 0..<5 where !begin.isHittable { app.swipeUp() }
             let automatic = app.switches["Automatisch starten bij AirPods-gebruik"]
             if automatic.value as? String == "1" { automatic.tap() }
             begin.tap()

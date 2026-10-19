@@ -34,6 +34,7 @@ final class MonitorModel: ObservableObject {
     private var generation = UUID()
     private var processing: Task<Void, Never>?
     private var preparation: Task<Void, Never>?
+    private var isRecovering = false
     private var engine = ThresholdEngine(rule: MonitorSettings.load().threshold)
     private var bluetooth: BluetoothMonitor?
     let health = HealthMonitor()
@@ -61,6 +62,9 @@ final class MonitorModel: ObservableObject {
         } }
     }
     private func attachRecoveredWorkout() async {
+        guard !isRecovering else { return }
+        isRecovering = true
+        defer { isRecovering = false }
         do {
             guard try await health.recover() else { return }
             if isManuallySuppressed || isStopping { try await health.stop(); return }
@@ -73,7 +77,7 @@ final class MonitorModel: ObservableObject {
     }
     func recoverSystemWorkout() async {
         await preparation?.value
-        guard !isRequested else { return }
+        guard !isRequested, !isStopping else { return }
         await attachRecoveredWorkout()
     }
     func completeOnboarding() {
@@ -138,13 +142,13 @@ final class MonitorModel: ObservableObject {
             if let trigger = engine.consume(sample, now: Date()) {
                 try await store.event("Grens overschreden: \(Int(trigger.bpm)) BPM boven \(Int(trigger.threshold)) BPM", at: trigger.triggeredAt, sessionID: id)
                 guard generation == token, isRequested, settings.threshold == appliedRule else { return }
-                do {
-                    try await NotificationService.send(trigger, hideBPM: settings.hideBPM)
-                    try await store.event("Notificatie bij iOS aangevraagd", sessionID: id)
-                } catch {
+                let notificationAccepted: Bool
+                do { try await NotificationService.send(trigger, hideBPM: settings.hideBPM); notificationAccepted = true }
+                catch {
+                    notificationAccepted = false
                     notice = "Melding kon niet worden aangevraagd. Controleer notificatietoegang."
-                    try await store.event("Notificatieverzoek mislukt", sessionID: id)
                 }
+                try await store.event(notificationAccepted ? "Notificatie bij iOS aangevraagd" : "Notificatieverzoek mislukt", sessionID: id)
             }
         } catch {
             lastError = "Opslaan mislukt; meting wordt gestopt: \(error.localizedDescription)"

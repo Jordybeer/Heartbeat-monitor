@@ -1,8 +1,8 @@
 # AirPods-hartslag voor iPhone 17 — projectblueprint
 
-Versie 0.5 · 19 oktober 2026 · Concept voor besluitvorming
+Versie 0.5 · 19 oktober 2026 · Oorspronkelijk ontwerp
 
-Dit document beschrijft het hele project vóór implementatie. Het onderscheidt de gevraagde functies, technische feiten, ontwerpvoorstellen en nog onbeantwoorde keuzes. Er is nog geen app gebouwd of op fysieke hardware getest. Het document belooft geen ononderbroken dagelijkse achtergrondmeting voordat de daarvoor beschreven hardwareproef slaagt.
+Dit document bewaart het ontwerp van vóór de implementatie. Na de opdracht voor een autonome one-shot is de native app uitgewerkt; zie `decisions.md` voor concrete keuzes en de README voor bouw- en installatie-instructies. De hardwareproef blijft open. Dit document belooft geen ononderbroken dagelijkse achtergrondmeting voordat die proef slaagt.
 
 ## 1. Doel en vaststaande eisen
 

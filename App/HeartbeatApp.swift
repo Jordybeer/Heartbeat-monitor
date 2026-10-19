@@ -6,10 +6,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         UNUserNotificationCenter.current().delegate = self
         return true
     }
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        if options.shouldHandleActiveWorkoutRecovery {
+            UserDefaults.standard.set(true, forKey: "workoutWasActive")
+            Task { @MainActor in await MonitorModel.shared.recoverSystemWorkout() }
+        }
+        let configuration = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound, .list])
     }
 }
+
+final class SceneDelegate: NSObject, UIWindowSceneDelegate {}
 
 @main
 struct HeartbeatApp: App {

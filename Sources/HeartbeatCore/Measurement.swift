@@ -42,7 +42,7 @@ public enum ChartSegments {
     public static func split(_ samples: [HeartRateSample], maximumGap: TimeInterval = 15) -> [[HeartRateSample]] {
         var result: [[HeartRateSample]] = []
         for sample in samples.sorted(by: { $0.timestamp < $1.timestamp }) {
-            if let last = result.last?.last, sample.timestamp.timeIntervalSince(last.timestamp) <= maximumGap {
+            if let last = result.last?.last, sample.source == last.source, sample.timestamp.timeIntervalSince(last.timestamp) <= maximumGap {
                 result[result.count - 1].append(sample)
             } else { result.append([sample]) }
         }
@@ -54,7 +54,10 @@ public enum CSVExport {
     public static func render(_ samples: [HeartRateSample]) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        func quoted(_ string: String) -> String { "\"" + string.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
+        func quoted(_ string: String) -> String {
+            let safe = string.first.map { "=+-@\t\r\n".contains($0) } == true ? "'" + string : string
+            return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
         let rows = samples.sorted { $0.timestamp < $1.timestamp }.map {
             [formatter.string(from: $0.timestamp), formatter.string(from: $0.receivedAt), String($0.bpm), quoted($0.source), $0.id.uuidString].joined(separator: ",")
         }

@@ -17,3 +17,6 @@ The user authorized autonomous execution after blueprint 0.5. These defaults are
 - Repository was empty; initialized README on main and isolated implementation on codex/oneshot.
 - Ruling: user autonomous one-shot authorizes implementation, repository commits and CI execution without additional design approvals.
 - Pre-flight: app and widget share only ActivityAttributes; domain package has no Apple sensor dependency. CI runs package tests and compiles both targets.
+- Domain TDD: run 39238522105 failed on missing types; run 39238780295 passed all 10 initial tests. Run 39240520688 demonstrated two failing regressions for source-change segmentation and spreadsheet-formula escaping before implementing their fixes.
+- Independent review found remembered-peripheral discovery blocking replacement sensors and missing active HealthKit workout recovery. Reconnect now keeps discovery available, the picker exposes rescan/forget, and bootstrap restores system workouts before automatic daily start or a cold Stop intent.
+- First device compile reached Xcode 26.3 and exposed missing Foundation imports in the notification/live-activity services; imports corrected. A successful device build is still required before delivery.

@@ -116,7 +116,8 @@ struct SensorPickerView: View {
             List {
                 Section {
                     Text("Draag je AirPods en verbind ze met deze iPhone. Alleen sensoren die een hartslagservice beschikbaar maken verschijnen hier.").font(.subheadline)
-                    if !model.isRequested { Button("Zoeken naar sensoren") { Task { await model.start() } } }
+                    Button("Opnieuw zoeken") { Task { await model.rescanSensors() } }.disabled(!model.ready || model.isStopping)
+                    Button("Sensorvoorkeur wissen") { Task { await model.forgetSensor() } }.disabled(!model.ready || model.isStopping)
                 }
                 Section("Beschikbare sensoren") {
                     if model.devices.isEmpty { Label("Nog geen hartslagsensor gevonden", systemImage: "antenna.radiowaves.left.and.right").foregroundStyle(.secondary) }

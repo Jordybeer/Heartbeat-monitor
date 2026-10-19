@@ -13,6 +13,21 @@ final class HealthMonitor: NSObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuil
     private var stopContinuation: CheckedContinuation<Date, Error>?
     private var stopToken: UUID?
     private let heartRate = HKQuantityType.quantityType(forIdentifier: .heartRate)!
+    var needsRecovery: Bool { UserDefaults.standard.bool(forKey: "workoutWasActive") }
+
+    func recover() async throws -> Bool {
+        guard session == nil else { return true }
+        guard let recovered = try await healthStore.recoverActiveWorkoutSession() else {
+            UserDefaults.standard.set(false, forKey: "workoutWasActive")
+            return false
+        }
+        let recoveredBuilder = recovered.associatedWorkoutBuilder()
+        session = recovered; builder = recoveredBuilder; lastSampleDate = nil
+        recovered.delegate = self; recoveredBuilder.delegate = self
+        recoveredBuilder.dataSource = HKLiveWorkoutDataSource(healthStore: healthStore, workoutConfiguration: recovered.workoutConfiguration)
+        UserDefaults.standard.set(true, forKey: "workoutWasActive")
+        return true
+    }
 
     func start(_ activity: HKWorkoutActivityType) async throws {
         guard HKHealthStore.isHealthDataAvailable() else { throw HealthError.unavailable }
@@ -25,16 +40,20 @@ final class HealthMonitor: NSObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuil
         newSession.delegate = self; newBuilder.delegate = self
         newBuilder.dataSource = HKLiveWorkoutDataSource(healthStore: healthStore, workoutConfiguration: configuration)
         session = newSession; builder = newBuilder; lastSampleDate = nil
+        UserDefaults.standard.set(true, forKey: "workoutWasActive")
         let now = Date(); newSession.prepare(); newSession.startActivity(with: now)
         do { try await newBuilder.beginCollection(at: now) }
-        catch { newSession.end(); session = nil; builder = nil; throw error }
+        catch { newSession.end(); session = nil; builder = nil; UserDefaults.standard.set(false, forKey: "workoutWasActive"); throw error }
         guard generation == token else { return }
         onStatus?("Work-out actief. Wachten op hartslag…")
     }
     func stop() async throws {
         generation = UUID()
-        guard let session, let builder else { return }
-        defer { stopToken = nil; session.end(); session.delegate = nil; builder.delegate = nil; self.session = nil; self.builder = nil }
+        guard let session, let builder else { UserDefaults.standard.set(false, forKey: "workoutWasActive"); return }
+        defer {
+            stopToken = nil; session.end(); session.delegate = nil; builder.delegate = nil; self.session = nil; self.builder = nil
+            UserDefaults.standard.set(false, forKey: "workoutWasActive")
+        }
         let stoppedAt: Date
         if session.state == .stopped || session.state == .ended { stoppedAt = Date() }
         else {

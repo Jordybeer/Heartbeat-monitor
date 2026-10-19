@@ -33,6 +33,7 @@ final class MonitorModel: ObservableObject {
     private var sessionID: UUID?
     private var generation = UUID()
     private var processing: Task<Void, Never>?
+    private var preparation: Task<Void, Never>?
     private var engine = ThresholdEngine(rule: MonitorSettings.load().threshold)
     private var bluetooth: BluetoothMonitor?
     let health = HealthMonitor()
@@ -42,14 +43,38 @@ final class MonitorModel: ObservableObject {
     var isManuallySuppressed: Bool { UserDefaults.standard.bool(forKey: "manualStop") }
 
     private init() {
-        Task {
+        preparation = Task {
             do {
                 let storage = try SessionStore(); store = storage
                 try await storage.recoverInterrupted(); try await storage.prune(days: settings.retentionDays)
-                await live.end(); await refreshHistory(); ready = true
-                if hasOnboarded && settings.autoStart && settings.mode == .daily && !isManuallySuppressed { await start(automatic: true) }
+                await live.end(); await refreshHistory()
+                if health.needsRecovery { await attachRecoveredWorkout() }
+                ready = true
+                if hasOnboarded && settings.autoStart && settings.mode == .daily && !isManuallySuppressed && !isRequested && !isStopping { await start(automatic: true) }
             } catch { lastError = "Meetlog kan niet worden geopend: \(error.localizedDescription)" }
         }
+    }
+    private func wireHealth(_ token: UUID) {
+        health.onSample = { [weak self] sample in Task { @MainActor in self?.enqueue(sample, token: token) } }
+        health.onStatus = { [weak self] message in Task { @MainActor in
+            guard let self, self.generation == token, self.isRequested else { return }; self.status = message
+        } }
+    }
+    private func attachRecoveredWorkout() async {
+        do {
+            guard try await health.recover() else { return }
+            if isManuallySuppressed || isStopping { try await health.stop(); return }
+            settings.mode = .workout
+            let token = UUID(); generation = token
+            samples = []; sessionID = nil; sessionStartedAt = nil; engine = .init(rule: settings.threshold)
+            startReason = "Work-out hersteld na onderbreking"; status = "Work-out hersteld. Wachten op verse hartslag…"
+            isRequested = true; wireHealth(token); createLiveActivity()
+        } catch { lastError = "Herstellen van de actieve work-out mislukt: \(error.localizedDescription)" }
+    }
+    func recoverSystemWorkout() async {
+        await preparation?.value
+        guard !isRequested else { return }
+        await attachRecoveredWorkout()
     }
     func completeOnboarding() {
         hasOnboarded = true; UserDefaults.standard.set(true, forKey: "onboarded")
@@ -74,10 +99,7 @@ final class MonitorModel: ObservableObject {
             } }
             sensor.start()
         } else {
-            health.onSample = { [weak self] sample in Task { @MainActor in self?.enqueue(sample, token: token) } }
-            health.onStatus = { [weak self] message in Task { @MainActor in
-                guard let self, self.generation == token, self.isRequested else { return }; self.status = message
-            } }
+            wireHealth(token)
             do { try await health.start(settings.workout.activity) }
             catch { guard generation == token else { return }; lastError = error.localizedDescription; await stop() }
         }
@@ -133,6 +155,7 @@ final class MonitorModel: ObservableObject {
         guard !isStopping else { return }
         isStopping = true; isRequested = false; generation = UUID()
         UserDefaults.standard.set(true, forKey: "manualStop")
+        await preparation?.value
         bluetooth?.stop(); status = "Afronden…"
         await processing?.value; processing = nil
         do { try await health.stop() } catch { lastError = "Work-out kon niet volledig worden afgerond: \(error.localizedDescription)" }
@@ -153,6 +176,15 @@ final class MonitorModel: ObservableObject {
         await stop()
         let sensor = bluetooth ?? BluetoothMonitor(); bluetooth = sensor
         sensor.select(device.id); await start()
+    }
+    func rescanSensors() async {
+        if !isRequested { await start() }
+        bluetooth?.rescan()
+    }
+    func forgetSensor() async {
+        await stop()
+        bluetooth?.forget(); devices = []
+        await start()
     }
     func refreshHistory() async {
         do { sessions = try await store?.sessions() ?? [] } catch { lastError = "Geschiedenis niet beschikbaar: \(error.localizedDescription)" }

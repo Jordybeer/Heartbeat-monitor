@@ -30,6 +30,10 @@ final class BluetoothMonitor: NSObject, CBCentralManagerDelegate, CBPeripheralDe
         if enabled { search() }
     }
     func forget() { UserDefaults.standard.removeObject(forKey: "sensorID") }
+    func rescan() {
+        candidates = [:]; onDevices?([])
+        search()
+    }
     private func search() {
         guard enabled else { return }
         guard central.state == .poweredOn else {
@@ -39,11 +43,13 @@ final class BluetoothMonitor: NSObject, CBCentralManagerDelegate, CBPeripheralDe
         onStatus?("Zoeken naar een hartslagsensor…")
         let connected = central.retrieveConnectedPeripherals(withServices: [service])
         for item in connected { remember(item) }
+        central.scanForPeripherals(withServices: [service], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        guard peripheral == nil else { return }
         if let selectedID, let known = central.retrievePeripherals(withIdentifiers: [selectedID]).first {
+            remember(known)
             connect(known); return
         }
         if let airpods = connected.first(where: { $0.name?.localizedCaseInsensitiveContains("airpod") == true }) { connect(airpods); return }
-        central.scanForPeripherals(withServices: [service], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
     }
     private func remember(_ item: CBPeripheral) {
         candidates[item.identifier] = item
@@ -51,9 +57,9 @@ final class BluetoothMonitor: NSObject, CBCentralManagerDelegate, CBPeripheralDe
     }
     private func connect(_ item: CBPeripheral) {
         guard enabled else { return }
-        peripheral = item; item.delegate = self; central.stopScan()
+        peripheral = item; item.delegate = self
         onStatus?("Verbinden met \(item.name ?? "sensor")…")
-        if item.state == .connected { item.discoverServices([service]) } else { central.connect(item) }
+        if item.state == .connected { central.stopScan(); item.discoverServices([service]) } else { central.connect(item) }
     }
     func centralManagerDidUpdateState(_ central: CBCentralManager) { search() }
     func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
@@ -62,18 +68,23 @@ final class BluetoothMonitor: NSObject, CBCentralManagerDelegate, CBPeripheralDe
     }
     func centralManager(_ central: CBCentralManager, didDiscover item: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
         guard enabled else { return }; remember(item)
-        if item.identifier == selectedID || (selectedID == nil && item.name?.localizedCaseInsensitiveContains("airpod") == true) { connect(item) }
+        if peripheral == nil && (item.identifier == selectedID || (selectedID == nil && item.name?.localizedCaseInsensitiveContains("airpod") == true)) { connect(item) }
     }
     func centralManager(_ central: CBCentralManager, didConnect item: CBPeripheral) {
         guard enabled, item.identifier == peripheral?.identifier else { central.cancelPeripheralConnection(item); return }
-        item.delegate = self; item.discoverServices([service])
+        central.stopScan(); remember(item); item.delegate = self; item.discoverServices([service])
     }
     func centralManager(_ central: CBCentralManager, didFailToConnect item: CBPeripheral, error: Error?) {
-        guard enabled else { return }; onStatus?("Verbinding mislukt. Tik op Stop en probeer opnieuw.")
+        guard enabled, item.identifier == peripheral?.identifier else { return }
+        peripheral = nil
+        central.scanForPeripherals(withServices: [service], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        onStatus?("Verbinding mislukt. Kies een sensor of zoek opnieuw.")
     }
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral item: CBPeripheral, error: Error?) {
         guard enabled, item.identifier == peripheral?.identifier else { return }
-        onStatus?("Verbinding onderbroken; wachten op de sensor…"); central.connect(item)
+        onStatus?("Verbinding onderbroken; wachten op de sensor…")
+        central.scanForPeripherals(withServices: [service], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        central.connect(item)
     }
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard enabled, peripheral.identifier == self.peripheral?.identifier else { return }

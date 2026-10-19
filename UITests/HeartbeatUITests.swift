@@ -13,7 +13,7 @@ final class HeartbeatUITests: XCTestCase {
             screenshot("Onboarding")
             for _ in 0..<5 where !begin.isHittable { app.swipeUp() }
             let automatic = app.switches["Automatisch starten bij AirPods-gebruik"]
-            if automatic.value as? String == "1" { automatic.tap() }
+            setSwitch(automatic, enabled: false)
             begin.tap()
         }
         XCTAssertTrue(app.staticTexts["Tijdlijn"].waitForExistence(timeout: 10))
@@ -36,9 +36,8 @@ final class HeartbeatUITests: XCTestCase {
         app.tabBars.buttons["Instellingen"].tap()
         let automatic = app.switches["Automatisch starten"]
         XCTAssertTrue(automatic.waitForExistence(timeout: 10))
-        if automatic.value as? String == "1" { automatic.tap() }
-        automatic.tap()
-        XCTAssertEqual(automatic.value as? String, "1")
+        setSwitch(automatic, enabled: false)
+        setSwitch(automatic, enabled: true)
         app.tabBars.buttons["Nu"].tap()
 
         let toggle = app.buttons["monitor.toggle"]
@@ -82,8 +81,7 @@ final class HeartbeatUITests: XCTestCase {
         let previous = privacy.value as? String
         XCTAssertTrue(previous == "0" || previous == "1")
         let expected = previous == "1" ? "0" : "1"
-        privacy.tap()
-        XCTAssertEqual(privacy.value as? String, expected)
+        setSwitch(privacy, enabled: expected == "1")
 
         app.terminate()
         app.launch()
@@ -106,6 +104,19 @@ final class HeartbeatUITests: XCTestCase {
         let ready = NSPredicate(format: "exists == true AND enabled == true AND label == %@", label)
         let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: element)], timeout: 10)
         XCTAssertEqual(result, .completed, "Expected enabled session control: \(label); got \(element.label)")
+    }
+
+    private func setSwitch(_ element: XCUIElement, enabled: Bool) {
+        XCTAssertTrue(element.waitForExistence(timeout: 10))
+        let expected = enabled ? "1" : "0"
+        if element.value as? String != expected {
+            XCTAssertTrue(element.isHittable)
+            // SwiftUI exposes the whole labeled row as a switch. Hit the trailing control.
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
+        let changed = NSPredicate(format: "value == %@", expected)
+        let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: changed, object: element)], timeout: 10)
+        XCTAssertEqual(result, .completed, "Expected switch value \(expected); got \(String(describing: element.value))")
     }
 
     private func screenshot(_ name: String) {

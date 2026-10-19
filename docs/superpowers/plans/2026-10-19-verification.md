@@ -43,3 +43,5 @@ These tests cover existing behavior. A failing assertion will be investigated be
 ## CI finding
 
 Both the unchanged main re-run and the test-only run timed out during the simulator's initial data migration, before launching Heartbeat. The previous successful run used the same Xcode 26.6 / iOS 26.5 image and completed its cold boot in about three minutes. Increase only the boot-step budget from five to ten minutes; retain the overall thirty-minute job bound and all test assertions. A successful boot and executed UI tests are required before calling verification complete.
+
+Run 15 completed simulator boot and executed all three UI tests. The two new tests failed before their lifecycle/persistence checks because XCTest tapped the center of a SwiftUI switch's labeled row. Exported event records show x=201 while the actual switch is on the right. Target the trailing control within the element's frame and wait for its expected accessibility value. Keep all lifecycle and persistence assertions; production code remains unchanged.

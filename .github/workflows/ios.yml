@@ -89,7 +89,7 @@ jobs:
           xcrun simctl boot "$SIMULATOR_ID" || true
           xcrun simctl bootstatus "$SIMULATOR_ID" -b
       - name: Verify native screens
-        timeout-minutes: 12
+        timeout-minutes: 15
         run: |
           set -o pipefail
           xcodebuild test -project Heartbeat.xcodeproj -scheme Heartbeat -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -destination-timeout 120 -parallel-testing-enabled NO -test-iterations 3 -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 180 -derivedDataPath build/Simulator -resultBundlePath build/UITests.xcresult CODE_SIGNING_ALLOWED=NO > build/ui-tests.log 2>&1 || { tail -100 build/ui-tests.log; exit 1; }

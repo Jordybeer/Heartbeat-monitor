@@ -13,6 +13,12 @@ final class HeartbeatUITests: XCTestCase {
             screenshot("Onboarding")
             for _ in 0..<5 where !begin.isHittable { app.swipeUp() }
             let automatic = app.switches["Automatisch starten bij AirPods-gebruik"]
+            // Suite repetitions preserve onboarding completion. Exercise this
+            // combined switch in both directions before completing onboarding.
+            for _ in 0..<3 {
+                setSwitch(automatic, enabled: false, in: app)
+                setSwitch(automatic, enabled: true, in: app)
+            }
             setSwitch(automatic, enabled: false, in: app)
             begin.tap()
         }

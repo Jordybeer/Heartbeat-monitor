@@ -59,6 +59,13 @@ final class HeartbeatUITests: XCTestCase {
         screenshot("MonitoringWithoutSensor")
 
         XCUIDevice.shared.press(.home)
+        let background = NSPredicate { _, _ in
+            app.state == .runningBackground || app.state == .runningBackgroundSuspended
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: background, object: nil)], timeout: 10), .completed)
+        // Exercise a real background interval, rather than immediately reversing the home animation.
+        Thread.sleep(forTimeInterval: 10)
+        XCTAssertTrue(app.state == .runningBackground || app.state == .runningBackgroundSuspended)
         screenshot("BackgroundLiveActivity")
         app.activate()
         assertLabel("Meting stoppen", on: app.buttons["monitor.toggle"])

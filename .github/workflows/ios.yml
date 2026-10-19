@@ -1,0 +1,113 @@
+name: iOS IPA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select iOS 26 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' ! -iname '*beta*' | sort -V | tail -1)
+          test -n "$XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          python3 - <<'PY'
+          import subprocess,re
+          version=subprocess.check_output(['xcodebuild','-version'],text=True).splitlines()[0]
+          numbers=tuple(map(int,re.search(r'Xcode (\d+)\.(\d+)',version).groups()))
+          assert numbers >= (26,4), 'Xcode 26.4+ required for simulator hang fix 172343027'
+          PY
+      - name: Test measurement domain
+        run: swift test
+      - name: Generate Xcode project
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate
+      - name: Build iPhone app and Live Activity
+        run: |
+          set -o pipefail
+          xcodebuild -project Heartbeat.xcodeproj -scheme Heartbeat -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build > build/device-build.log 2>&1 || { tail -150 build/device-build.log; exit 1; }
+          tail -12 build/device-build.log
+      - name: Package SideStore IPA
+        run: |
+          bash scripts/package_ipa.sh build/DerivedData/Build/Products/Release-iphoneos/Heartbeat.app
+          bash scripts/build_metadata.sh
+          cp App/Heartbeat.entitlements build/artifacts/Expected-HealthKit.entitlements
+          shasum -a 256 build/artifacts/Heartbeat-sideload.ipa > build/artifacts/SHA256.txt
+      - name: Upload IPA and build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heartbeat-IPA-${{ github.run_number }}
+          path: build/artifacts/
+          retention-days: 14
+      - name: Upload compilation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heartbeat-build-log-${{ github.run_number }}
+          path: build/device-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Choose iPhone simulator
+        timeout-minutes: 3
+        run: |
+          xcrun simctl list devices available -j > build/simulators.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json,re,sys
+          devices=[]
+          for runtime,group in json.load(open('build/simulators.json'))['devices'].items():
+              match=re.search(r'\.iOS-(\d+)-(\d+)',runtime)
+              if not match or int(match[1]) < 26: continue
+              for device in group:
+                  if 'iPhone' in device['name']: devices.append((tuple(map(int,match.groups())),runtime,device))
+          devices.sort(key=lambda item: ('iPhone 17' not in item[2]['name'], -item[0][0], -item[0][1], item[2]['name']))
+          if not devices: raise SystemExit('No iPhone simulator available')
+          _,runtime,device=devices[0]
+          print(device['name']+' / '+runtime,file=sys.stderr)
+          print('SIMULATOR_ID='+device['udid'])
+          PY
+      - name: Boot selected iPhone simulator
+        timeout-minutes: 5
+        run: |
+          xcrun simctl boot "$SIMULATOR_ID" || true
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+      - name: Verify native screens
+        timeout-minutes: 12
+        run: |
+          set -o pipefail
+          xcodebuild test -project Heartbeat.xcodeproj -scheme Heartbeat -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -destination-timeout 120 -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 180 -derivedDataPath build/Simulator -resultBundlePath build/UITests.xcresult CODE_SIGNING_ALLOWED=NO > build/ui-tests.log 2>&1 || { tail -100 build/ui-tests.log; exit 1; }
+          tail -15 build/ui-tests.log
+      - name: Export native screen captures
+        if: always()
+        run: |
+          if [ -d build/UITests.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/UITests.xcresult --output-path build/screenshots
+          fi
+      - name: Upload UI verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heartbeat-UI-${{ github.run_number }}
+          path: |
+            build/screenshots/
+            build/ui-tests.log
+            build/simulators.json
+          if-no-files-found: ignore
+          retention-days: 7
